@@ -2,31 +2,47 @@
 
 import subprocess
 
-cmd="upsc ups"
-output=""
-# only needed measurement
-measurements=["battery.charge","battery.voltage","battery.runtime","input.voltage","ups.load",
-            "ups.beeper.status", "ups.mfr","ups.model", "ups.serial", "ups.status", "ups.test.result"]
-# text measurement
-string_measurements=["battery.mfr.date", "battery.type", "battery.date", "device.mfr", "device.model","device.serial","device.type",
-			"driver.name", "driver.paramter.port", "driver.parameter.synchronous", "driver.version", "driver.version.data", "driver.version.internal", "input.sensitivity",
-			"ups.beeper.status", "ups.mfr","ups.model", "ups.serial", "ups.status", "ups.test.result", "ups.firmware", "ups.firmware.aux","ups.mfr.date", "ups.productid",
-            "driver.parameter.port", "driver.parameter.syncronous"]
+# UPS_NAME should not contain commas, spaces, equals characters
+UPS_NAME = "UPSCyberPower"
+UPSC_CMD = "/usr/local/bin/upsc"
+
+cmd = UPSC_CMD + " " + UPS_NAME
+output = ""
+fields = ""
+tags = ""
+
+# adjust tag_keys and field_keys according to 'upsc' output
+tag_keys = ["battery.type", "device.mfr", "device.model", "device.type", "ups.status"]
+
+# True if field is a value, False otherwise (it's a string)
+field_keys = {"battery.charge":True, "battery.runtime":True, "battery.voltage":True,
+   "input.voltage":True, "input.voltage.nominal":True, "output.voltage":True, 
+   "ups.load":True}
 
 p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
 
 for line in p.stdout.readlines(): #read and store result in log file
-    line = line.decode("utf-8").rstrip()
-    key = line[:line.find(":")]
-    value = line[line.find(":")+2:]
+    line = line.decode("utf-8")
+    aline = line.split(":")
 
-    if key in measurements:
-        if key in string_measurements:
-            value = '"' + value + '"'
-        measurement = key + "=" + value
-        if output != "":
-            measurement = "," + measurement
-        output += measurement
+    key = aline[0].strip()
+    value = aline[1].strip()
 
-output = "ups_nut " + output.rstrip()
+    if key in field_keys:
+       fields += "," if fields != "" else ""
+       
+       if field_keys[key]:
+          # field is a value
+          fields += key + "=" + value
+       else:
+       	 # field is a string
+          fields += key + '="' + value + '"'
+
+    elif key in tag_keys:
+       tags += "," + key + "=" + value.replace(" ", "\\ ")
+
+    # else:
+    	 # key not listed - ignore it
+
+output = "upsc,name=" + UPS_NAME + tags + " " + fields
 print(output, end='')
